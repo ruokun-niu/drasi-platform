@@ -10,7 +10,7 @@ if (-not $namespace) {
 Write-Host "Setting up Postgres..."
 
 # Deploy Postgres
-kubectl apply -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-postgres.yaml -n default
+kubectl apply -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-postgres.yaml -n default
 kubectl wait --for=condition=ready --timeout=60s pod -l app=postgres -n default
 
 Write-Host "Postgres database is created in the 'default' namespace"
@@ -22,17 +22,17 @@ drasi namespace set $namespace
 
 # Apply source
 Write-Host "Applying a Source with the name 'quick-test'"
-drasi apply -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-source.yaml
+drasi apply -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-source.yaml
 drasi wait source quick-test -t 120
 
 # Apply continuous query
 Write-Host "Applying a ContinuousQuery with the name 'quick-query'"
-drasi apply -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-query.yaml
+drasi apply -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-query.yaml
 Start-Sleep -Seconds 5
 
 # Apply Reaction
 Write-Host "Applying a Reaction with the name 'quick-result-reaction'"
-drasi apply -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-reaction.yaml
+drasi apply -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-reaction.yaml
 
 drasi wait reaction quick-result-reaction -t 120
 
@@ -94,18 +94,18 @@ if ($final_parsed_output -eq $expected_output) {
 
     # Cleaning up resources
     Write-Host "Cleaning up resources..."
-    kubectl delete -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-postgres.yaml -n default
+    kubectl delete -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-postgres.yaml -n default
 
-    drasi delete -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-reaction.yaml
-    drasi delete -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-query.yaml
-    drasi delete -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-source.yaml
+    drasi delete -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-reaction.yaml
+    drasi delete -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-query.yaml
+    drasi delete -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-source.yaml
     
 } else {
     Write-Host "Quick test failed"
 
     Write-Host "Resources are not deleted. If you wish to clean up everything, run the following command:"
 
-    Write-Host "Invoke-Command -ScriptBlock ([scriptblock]::Create([System.Text.Encoding]::UTF8.GetString((New-Object Net.WebClient).DownloadData('https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/cleanup-quick-test-environment.ps1')))) -ArgumentList <namespace>"
+    Write-Host "Invoke-Command -ScriptBlock ([scriptblock]::Create([System.Text.Encoding]::UTF8.GetString((New-Object Net.WebClient).DownloadData('https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/cleanup-quick-test-environment.ps1')))) -ArgumentList <namespace>"
     
     exit 1
 }

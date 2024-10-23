@@ -10,7 +10,7 @@ fi
 echo Setting up Postgres...
 
 # Deploy Postgres 
-kubectl apply -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-postgres.yaml -n default
+kubectl apply -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-postgres.yaml -n default
 kubectl wait --for=condition=ready --timeout=60s pod -l app=postgres -n default
 
 
@@ -22,17 +22,17 @@ drasi namespace set $namespace   # Set the namespace
 
 # Apply source
 echo Applying a Source with the name 'quick-test'
-drasi apply -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-source.yaml
+drasi apply -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-source.yaml
 drasi wait source quick-test -t 120
 
 # Apply continuous query 
 echo Applying a ContinuousQuery with the name 'quick-query'
-drasi apply -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-query.yaml
+drasi apply -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-query.yaml
 sleep 5
 
 # Apply Reaction
 echo Applying a Reaction with the name 'quick-result-reaction'
-drasi apply -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-reaction.yaml
+drasi apply -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-reaction.yaml
 
 drasi wait reaction quick-result-reaction -t 120
 
@@ -68,15 +68,15 @@ if [ "$final_parsed_output" == "$expected_output" ]; then
     echo "Quick test passed!"
 
     echo "cleaning up resources..."
-    kubectl delete -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-postgres.yaml -n default
+    kubectl delete -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-postgres.yaml -n default
 
-    drasi delete -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-reaction.yaml
-    drasi delete -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-query.yaml
-    drasi delete -f https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/resources/quick-test-source.yaml
+    drasi delete -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-reaction.yaml
+    drasi delete -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-query.yaml
+    drasi delete -f https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/resources/quick-test-source.yaml
 
 else
     echo "Quick test failed"
 
-    echo "Resources are not deleted. If you wish to clean up everything, run 'curl -s https://raw.githubusercontent.com/drasi-project/drasi-platform/main/dev-tools/testing/quick-test-environment/cleanup-quick-test-environment.sh | bash'"
+    echo "Resources are not deleted. If you wish to clean up everything, run 'curl -s https://raw.githubusercontent.com/ruokun-niu/drasi-platform/smoke-test/dev-tools/testing/quick-test-environment/cleanup-quick-test-environment.sh | bash'"
     exit 1
 fi
