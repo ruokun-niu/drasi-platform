@@ -124,7 +124,11 @@ public class RelationalChangeConsumer implements DebeziumEngine.ChangeConsumer<C
         }
 
         var nodeId = createNodeId(mapping.tableName, item.path(mapping.keyField).asText());
-        var timestamp = payload.path("ts_ms").asLong();
+        System.out.println("Payload: " + payload.toPrettyString()); // or payload.toString() for compact format
+
+        var timestamp = payload.path("ts_ns").asLong();
+        System.out.println("Timestamp: " + timestamp);
+
         var lsn = dbStrategy.extractLsn(source);
 
         return switch (changeType) {

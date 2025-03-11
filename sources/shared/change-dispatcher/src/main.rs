@@ -162,13 +162,6 @@ async fn process_changes(
                         ));
                     }
                 };
-            // dispatch_event["metadata"]["tracking"]["source"]["changeDispatcherEnd_ms"] =
-            //     match serde_json::to_value(0) {
-            //         Ok(val) => val,
-            //         Err(_) => {
-            //             unreachable!();
-            //         }
-            //     };
 
             let subscriptions = match change_event["subscriptions"].as_array() {
                 Some(subs) => subs.clone(),

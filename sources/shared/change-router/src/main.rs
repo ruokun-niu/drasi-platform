@@ -276,6 +276,7 @@ async fn process_changes(
                 "Processing change - db:{}, type:{}, id:{}",
                 change["payload"]["source"]["db"], change["payload"]["source"]["table"], change_id
             );
+            info!("ChangeEvent: {}", change);
             debug!("ChangeEvent: {}", change);
 
             // Subscription and unsubscription events
@@ -517,7 +518,7 @@ async fn process_changes(
                         "subscriptions": subscriptions,
                         "time": {
                             "seq": change["payload"]["source"]["lsn"],
-                            "ms": change["ts_ms"]
+                            "ns": change["ts_ns"]
                         },
                         "before": change["payload"]["before"],
                         "after": change["payload"]["after"],
@@ -525,13 +526,18 @@ async fn process_changes(
                             "tracking": {
                                 "source": {
                                     "seq": change["payload"]["source"]["lsn"],
-                                    "reactivator_ms": change["ts_ms"],
-                                    "changeSvcStart_ns": change_router_start,
-                                    "changeSvcEnd_ns": chrono::Utc::now().timestamp_nanos(),
+                                    "reactivator_ns": change["ts_ns"],
+                                    "changeRouterStart_ns": change_router_start,   // renamed from changeSvcStart_ns to changeRouterStart_ns
+                                    "changeRouterEnd_ns": chrono::Utc::now().timestamp_nanos(),  // renamed from changeSvcEnd_ns to changeRouterEnd_ns
                                 }
                             }
                         }
                     }]);
+
+                    info!(
+                        "ChangeEvent: {}",
+                        serde_json::to_string_pretty(&change_dispatch_event).unwrap()
+                    );
 
                     let publish_topic = format!("{}-dispatch", config.source_id);
                     let mut headers = std::collections::HashMap::new();

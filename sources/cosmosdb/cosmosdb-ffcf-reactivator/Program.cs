@@ -131,7 +131,7 @@ namespace ChangeFeedSample
                     throw new NotSupportedException();
             }            
             
-            result["ts_ms"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            result["ts_ns"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1_000_000.0;
             result["schema"] = "";
 
             var isRelation = (bool)(source["_isEdge"] ?? false);
