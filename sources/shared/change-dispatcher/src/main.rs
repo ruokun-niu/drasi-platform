@@ -92,7 +92,7 @@ async fn subscribe() -> impl IntoResponse {
     let config = ChangeDispatcherConfig::new();
     let subscriptions = vec![json! {
         {
-            "pubsubname": config.pubsub_name.clone(),
+            "pubsubname": &config.pubsub_name,
             "topic": format!("{}-dispatch", config.source_id),
             "route": "receive"
         }
@@ -117,10 +117,10 @@ async fn receive(
         None => "".to_string(),
     };
 
-    let config = state.config.clone();
+
     let invoker = &state.invoker;
     let json_data = body["data"].clone();
-    match process_changes(invoker, json_data, config, traceparent, receive_time).await {
+    match process_changes(invoker, json_data, &state.config, traceparent, receive_time).await {
         Ok(_) => StatusCode::OK.into_response(),
         Err(e) => {
             log::error!("Error processing changes: {:?}", e);
@@ -136,7 +136,7 @@ async fn receive(
 async fn process_changes(
     invoker: &DaprHttpInvoker,
     changes: Value,
-    _config: ChangeDispatcherConfig,
+    _config: &ChangeDispatcherConfig,
     traceparent: String,
     receive_time: i64,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -167,14 +167,9 @@ async fn process_changes(
         dispatch_event["metadata"]["tracking"]["source"]["changeDispatcherStart_ns"] =
             start_time.into();
 
-        let subscriptions = match change_event["subscriptions"].as_array() {
-            Some(subs) => subs.clone(),
-            None => {
-                return Err(Box::<dyn std::error::Error>::from(
-                    "Error getting subscriptions from change event",
-                ));
-            }
-        };
+        let subscriptions = change_event["subscriptions"].as_array().ok_or_else(|| {
+            Box::<dyn std::error::Error>::from("Error getting subscriptions from change event")
+        })?;
 
         let query_nodes: HashSet<&str> = subscriptions
             .iter()
@@ -187,7 +182,7 @@ async fn process_changes(
             let queries: Vec<_> = subscriptions
                 .iter()
                 .filter(|x| x["queryNodeId"] == query_node_id)
-                .map(|x| x["queryId"].clone())
+                .map(|x| &x["queryId"])
                 .collect();
             dispatch_event["queries"] = match serde_json::to_value(queries) {
                 Ok(val) => val,
