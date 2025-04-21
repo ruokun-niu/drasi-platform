@@ -44,7 +44,7 @@ pub enum Verb {
 impl HttpStreamingInvoker {
     pub async fn invoke(
         &self,
-        data: Payload,
+        data: Payload<'_>,
         app_id: &str,
         verb: Verb,
         path: &str,

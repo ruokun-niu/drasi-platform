@@ -261,6 +261,7 @@ dependencies = [
  "drasi-comms-abstractions",
  "drasi-comms-dapr",
  "env_logger",
+ "futures",
  "log",
  "prost",
  "prost-types",
@@ -325,6 +326,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "drasi-comms-abstractions",
+ "futures",
  "reqwest 0.12.12",
  "serde_json",
 ]
@@ -1276,11 +1278,13 @@ dependencies = [
  "system-configuration 0.6.1",
  "tokio",
  "tokio-native-tls",
+ "tokio-util",
  "tower",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
  "windows-registry",
 ]
@@ -1912,6 +1916,19 @@ name = "wasm-bindgen-shared"
 version = "0.2.94"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a42f6c679374623f295a8623adfe63d9284091245c3504bde47c17a3ce2777d9"
+
+[[package]]
+name = "wasm-streams"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e072d4e72f700fb3443d8fe94a39315df013eef1104903cdb0a2abd322bbecd"
+dependencies = [
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
 
 [[package]]
 name = "web-sys"

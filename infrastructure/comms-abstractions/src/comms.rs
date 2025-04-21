@@ -31,9 +31,10 @@ impl Headers {
     }
 }
 
-pub enum Payload {
+pub enum Payload<'a> {
     None,
     Json(Value),
+    JsonRef(&'a Value),
     Bytes(bytes::Bytes),
 }
 
@@ -41,7 +42,7 @@ pub enum Payload {
 pub trait Invoker: Send + Sync {
     async fn invoke(
         &self,
-        data: Payload,
+        data: Payload<'_>,
         app_id: &str,
         method: &str,
         headers: Option<Headers>,

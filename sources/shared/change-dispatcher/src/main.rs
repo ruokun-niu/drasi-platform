@@ -23,6 +23,9 @@ use std::{
     sync::Arc,
 };
 
+use futures::future::join_all;
+use tokio::sync::Semaphore;
+
 use drasi_comms_abstractions::comms::{Headers, Invoker};
 use drasi_comms_dapr::comms::DaprHttpInvoker;
 
@@ -117,10 +120,13 @@ async fn receive(
         None => "".to_string(),
     };
 
+    // info!(
+    //     "Received changes: {}",
+    //     serde_json::to_string_pretty(&body).unwrap_or_default()
+    // );
 
     let invoker = &state.invoker;
-    let json_data = body["data"].clone();
-    match process_changes(invoker, json_data, &state.config, traceparent, receive_time).await {
+    match process_changes(invoker, &body["data"], &state.config, traceparent, receive_time).await {
         Ok(_) => StatusCode::OK.into_response(),
         Err(e) => {
             log::error!("Error processing changes: {:?}", e);
@@ -135,7 +141,7 @@ async fn receive(
 
 async fn process_changes(
     invoker: &DaprHttpInvoker,
-    changes: Value,
+    changes: &Value,
     _config: &ChangeDispatcherConfig,
     traceparent: String,
     receive_time: i64,
@@ -153,15 +159,9 @@ async fn process_changes(
             start_time = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
         }
         info!(
-            "Processing change - id:{}, subscription:{}",
+            "Processing change - id:{}, subscription_count:{}",
             change_event["id"],
-            match serde_json::to_string(&change_event["subscriptions"]) {
-                Ok(subs) => subs,
-                Err(_) =>
-                    return Err(Box::<dyn std::error::Error>::from(
-                        "Error serializing subscriptions into a string"
-                    )),
-            }
+            change_event["subscriptions"].as_array().map_or(0, |arr| arr.len())
         );
         let mut dispatch_event = change_event.clone();
         dispatch_event["metadata"]["tracking"]["source"]["changeDispatcherStart_ns"] =
@@ -211,8 +211,21 @@ async fn process_changes(
                         ));
                     }
                 };
+
+            let payload_size = match serde_json::to_string(&dispatch_event) {
+                Ok(val) => val.len(),
+                Err(_) => {
+                    return Err(Box::<dyn std::error::Error>::from(
+                        "Error serializing dispatch event into string",
+                    ));
+                }
+            };
+            info!(
+                "Dispatching change - id:{}, app_id:{}, payload_size:{}",
+                change_event["id"], app_id, payload_size
+            );
             match invoker
-                .invoke(
+                .invoke_stream(
                     Payload::Json(dispatch_event.clone()),
                     &app_id,
                     "change",
