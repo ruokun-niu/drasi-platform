@@ -25,10 +25,13 @@ use std::{
 
 use futures::future::join_all;
 use tokio::sync::Semaphore;
+use tokio::signal::unix::{signal, SignalKind};
 
 use drasi_comms_abstractions::comms::{Headers, Invoker};
 use drasi_comms_dapr::comms::DaprHttpInvoker;
+use drasi_comms_redis::reader::{RedisReader, RedisReaderSettings, RedisStreamReadResult, RedisStreamRecordData};
 
+use tokio::sync::mpsc::Receiver;
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
@@ -60,29 +63,77 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         invoker,
     });
 
-    let app = Router::new()
-        .route("/dapr/subscribe", get(subscribe))
-        .route("/receive", post(receive))
-        .with_state(shared_state);
+    let redis_settings = RedisReaderSettings::new(
+        "drasi-redis".to_string(), // Replace with config.redis_host if available
+        6379,                 
+        format!("{}-dispatch", config.source_id), // Match Dapr topic
+        None
+    );
 
-    let addr = format!("0.0.0.0:{}", config.app_port);
-    let listener = match tokio::net::TcpListener::bind(&addr).await {
-        Ok(listener) => listener,
-        Err(_e) => {
-            return Err(Box::<dyn std::error::Error>::from(
-                "Error binding to the address",
-            ));
+    let reader = RedisReader::new(redis_settings);
+    let rx = reader.start().await?;
+
+    // Spawn task to process messages from RedisReader
+    let state_clone = shared_state.clone();
+    tokio::spawn(async move {
+        process_messages(rx, state_clone).await;
+    });
+
+    let app = Router::new()
+        .route("/health", get(health_check))
+        .with_state(shared_state.clone());
+    let addr = "0.0.0.0:3000".to_string(); // Dapr expects port 3000
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    log::info!("Server started at: {}", addr);
+    // Run server and handle SIGTERM concurrently
+    let mut sigterm = signal(SignalKind::terminate())?;
+    tokio::select! {
+        result = axum::serve(listener, app) => {
+            if let Err(e) = result {
+                log::error!("Server error: {:?}", e);
+                return Err(e.into());
+            }
         }
-    };
-    match axum::serve(listener, app).await {
-        Ok(_) => {
-            log::info!("Server started at: {}", &addr);
+        _ = sigterm.recv() => {
+            log::info!("Received SIGTERM. Exiting...");
         }
-        Err(e) => {
-            log::error!("Error starting the server: {:?}", e);
-        }
-    };
+    }
+
+    
     Ok(())
+}
+
+async fn health_check() -> StatusCode {
+    StatusCode::OK
+}
+
+
+async fn process_messages(mut rx: Receiver<RedisStreamReadResult>, state: Arc<AppState>) {
+    while let Some(message) = rx.recv().await {
+        // Capture receive time in nanoseconds
+        let receive_time = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
+        // Extract traceparent (assuming Dapr includes it in the data payload)
+        let traceparent = match message.data.traceparent {
+            Some(ref tp) => tp.to_string(),
+            None => "".to_string(),
+        };
+        // log::info!(
+        //     "Received message: {}",
+        //     serde_json::to_string_pretty(&message).unwrap_or_default()
+        // );
+
+        // Process the message using existing process_changes function
+        match process_changes(
+            &state.invoker,
+            &message.data.data, // Pass the data field
+            &state.config,
+            traceparent,
+            receive_time,
+        ).await {
+            Ok(_) => log::info!("Message processed successfully"),
+            Err(e) => log::error!("Error processing message: {:?}", e),
+        }
+    }
 }
 
 struct AppState {
@@ -225,7 +276,7 @@ async fn process_changes(
                 change_event["id"], app_id, payload_size
             );
             match invoker
-                .invoke_stream(
+                .invoke(
                     Payload::Json(dispatch_event.clone()),
                     &app_id,
                     "change",
