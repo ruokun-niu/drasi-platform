@@ -27,9 +27,14 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use tokio::{signal::unix::{signal, SignalKind},
+    sync::mpsc::{Receiver, Sender},
+};
 
 use drasi_comms_abstractions::comms::{Headers, Publisher};
 use drasi_comms_dapr::comms::DaprHttpPublisher;
+use drasi_comms_redis_reader::reader::{RedisReader, RedisReaderSettings, RedisStreamReadResult,RedisStreamRecordData};
+use drasi_comms_redis_writer::writer::{RedisWriter, RedisWriterSettings};
 use state_manager::{DaprStateManager, StateEntry};
 
 mod change_router_config;
@@ -40,7 +45,7 @@ mod subscribers;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
-    log::info!("Starting Source Change Router");
+    println!("Starting Source Change Router");
 
     let config = ChangeRouterConfig::from_env();
 
@@ -66,12 +71,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     state_manager::wait_for_dapr_start(dapr_port).await?;
 
-    let publisher = DaprHttpPublisher::new(
-        "127.0.0.1".to_string(),
-        dapr_port,
-        config.pubsub_name.clone(),
-        topic,
-    );
     let state_manager = DaprStateManager::new("127.0.0.1", dapr_port, &config.subscriber_store);
 
     metadata.insert("contentType".to_string(), "application/json".to_string());
@@ -159,29 +158,68 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         rel_subscriber.get_label_map()
     );
 
+
+    let (tx, rx) = tokio::sync::mpsc::channel::<RedisStreamRecordData>(10000);
+
+
+    let redis_settings = RedisReaderSettings::new(
+        "drasi-redis".to_string(), // Replace with config.redis_host if available
+        6379,                 
+        format!("{}-change", config.source_id), // Match Dapr topic
+        Some(true)
+    );
+
+    let redis_writer_settings = RedisWriterSettings::new(
+        "drasi-redis".to_string(), // Replace with config.redis_host if available
+        6379,                 
+        format!("{}-dispatch", config.source_id), // Match Dapr topic
+    );
+
+    let redis_writer = RedisWriter::new(redis_writer_settings);
+
+    tokio::spawn(async move {
+        if let Err(e) = redis_writer.start(rx).await {
+            log::error!("RedisWriter failed: {:?}", e);
+        }
+    });
+
+    let reader = RedisReader::new(redis_settings);
+    let reader_rx = reader.start().await?;
+
     let shared_state = Arc::new(AppState {
         node_subscriber,
         rel_subscriber,
         config: config.clone(),
-        publisher,
         state_manager,
+        redis_writer_tx: tx,
     });
-    let subscriber_server = Router::new()
-        .route("/dapr/subscribe", get(subscribe))
-        .route("/receive", post(receive))
-        .with_state(shared_state);
+    let state_clone = shared_state.clone();
+    tokio::spawn(async move {
+        process_messages(reader_rx, state_clone).await;
+    });
 
-    let addr = format!("0.0.0.0:{}", config.app_port);
-    let listener = match tokio::net::TcpListener::bind(addr).await {
-        Ok(listener) => listener,
-        Err(e) => {
-            return Err(Box::<dyn std::error::Error>::from(format!(
-                "Error binding to address: {:?}",
-                e
-            )));
+        
+   
+
+    let app = Router::new()
+        .route("/health", get(health_check))
+        .with_state(shared_state.clone());
+    let addr = "0.0.0.0:3000".to_string(); // Dapr expects port 3000
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    log::info!("Server started at: {}", addr);
+    // Run server and handle SIGTERM concurrently
+    let mut sigterm = signal(SignalKind::terminate())?;
+    tokio::select! {
+        result = axum::serve(listener, app) => {
+            if let Err(e) = result {
+                log::error!("Server error: {:?}", e);
+                return Err(e.into());
+            }
         }
-    };
-    axum::serve(listener, subscriber_server).await.unwrap();
+        _ = sigterm.recv() => {
+            log::info!("Received SIGTERM. Exiting...");
+        }
+    }
 
     Ok(())
 }
@@ -190,74 +228,46 @@ struct AppState {
     node_subscriber: Subscriber,
     rel_subscriber: Subscriber,
     config: ChangeRouterConfig,
-    publisher: DaprHttpPublisher,
+    // publisher: DaprHttpPublisher,
     state_manager: DaprStateManager,
+    redis_writer_tx: Sender<RedisStreamRecordData>,
 }
 
-async fn subscribe() -> impl IntoResponse {
-    let config = ChangeRouterConfig::from_env();
-    let subscriptions = vec![json! {
-        {
-            "pubsubname": config.pubsub_name.clone(),
-            "topic": format!("{}-change", config.source_id),
-            "route": "receive"
-        }
-    }];
 
-    Json(subscriptions)
+
+async fn health_check() -> StatusCode {
+    StatusCode::OK
 }
 
-#[axum::debug_handler]
-async fn receive(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(body): Json<Value>,
-) -> impl IntoResponse {
-    // Capture the time when the pubsub receives the event
-    let receive_time = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
-    let trace_parent = match headers.get("traceparent") {
-        Some(trace_parent) => match trace_parent.to_str() {
-            Ok(trace_parent) => trace_parent.to_string(),
-            Err(_e) => "".to_string(),
-        },
-        None => "".to_string(),
-    };
-    let config = state.config.clone();
-    let node_subscriber = &state.node_subscriber;
-    let rel_subscriber = &state.rel_subscriber;
-    let json_data = body["data"].clone();
-
-    let publisher = &state.publisher;
-    let state_manager = &state.state_manager;
-    match process_changes(
-        publisher,
-        json_data,
-        config,
-        node_subscriber,
-        rel_subscriber,
-        trace_parent,
-        state_manager,
-        receive_time,
-    )
-    .await
-    {
-        Ok(_) => {}
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": e.to_string()})),
-            );
+async fn process_messages(mut rx: Receiver<RedisStreamReadResult>, state: Arc<AppState>) {
+    while let Some(message) = rx.recv().await {
+        let receive_time = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
+        info!("Received message: {:?}", serde_json::to_string_pretty(&message));
+        let traceparent = match message.data.traceparent {
+            Some(ref tp) => tp.to_string(),
+            None => "".to_string(),
+        };
+        match process_changes(
+            &state.redis_writer_tx,
+            &message.data.data, // Pass the data field
+            &state.config,
+            &state.node_subscriber,
+            &state.rel_subscriber,
+            traceparent,
+            &state.state_manager,    
+            receive_time,
+        ).await {
+            Ok(_) => {} ,
+            Err(e) => log::error!("Error processing message: {:?}", e),
         }
     }
-
-    (StatusCode::OK, Json(json!({"message": "Success"})))
 }
 
 #[allow(clippy::too_many_arguments)]
 async fn process_changes(
-    publisher: &DaprHttpPublisher,
-    changes: Value,
-    config: ChangeRouterConfig,
+    writer_channel: &Sender<RedisStreamRecordData>,
+    changes: &Value,
+    config: &ChangeRouterConfig,
     node_subscriber: &Subscriber,
     rel_subscriber: &Subscriber,
     traceparent: String,
@@ -560,14 +570,29 @@ async fn process_changes(
                     }
                 }]);
 
-                match publisher.publish(change_dispatch_event, headers).await {
-                    Ok(_) => {
-                        info!("published event to topic: {}", publish_topic);
-                    }
-                    Err(e) => {
-                        return Err(e);
-                    }
+                let record = RedisStreamRecordData {
+                    data: change_dispatch_event.clone(),
+                    id: change_id.clone(),
+                    traceparent: Some(traceparent.clone()),
+                    tracestate: None,
+                    topic: publish_topic.clone(),
+                };
+
+                // Send the record to the Redis writer
+                if let Err(e) = writer_channel.send(record).await {
+                    log::error!("Failed to send record to RedisWriter: {:?}", e);
+                } else {
                 }
+
+
+                // match publisher.publish(change_dispatch_event, headers).await {
+                //     Ok(_) => {
+                //         info!("published event to topic: {}", publish_topic);
+                //     }
+                //     Err(e) => {
+                //         return Err(e);
+                //     }
+                // }
             }
             None => {
                 log::info!("No subscribers for change: {:?}", change);

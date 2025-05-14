@@ -48,7 +48,7 @@ impl RedisReader {
     pub async fn start(&self) -> anyhow::Result<Receiver<RedisStreamReadResult>> {
         log::debug!("Initializing RedisReader with settings {:?}", self.settings);
 
-        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        let (tx, rx) = tokio::sync::mpsc::channel(1000);
         let settings = self.settings.clone();
 
         tokio::spawn(async move {
@@ -74,7 +74,7 @@ async fn reader_task(settings: RedisReaderSettings, tx: Sender<RedisStreamReadRe
     };
 
 
-    let opts = StreamReadOptions::default().count(1).block(100); // Reduced block time to 100ms
+    let opts = StreamReadOptions::default().count(1).block(5000); // Reduced block time to 100ms
 
     loop {
         match read_stream(&mut con, &stream_key, &last_id, &opts).await {
@@ -135,7 +135,7 @@ async fn read_stream(
                                     });
                                 }
                                 Err(e) => {
-                                    // log::info!("data_str: {:?}",  serde_json::to_string_pretty(&data_str).unwrap_or_default());
+                                    println!("data_str: {:?}",  serde_json::to_string_pretty(&data_str).unwrap_or_default());
                                     log::error!("Failed to deserialize message: {:?}", e);
                                 }
                             }

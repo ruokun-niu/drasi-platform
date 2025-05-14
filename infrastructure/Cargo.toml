@@ -3,9 +3,9 @@
 members = [
     "comms-abstractions",
     "comms-dapr",
-    "comms-http"
-, "comms-redis/reader"]
-
+    "comms-http",
+    "comms-redis"
+]
 [workspace.package]
 version = "0.1.0"
 

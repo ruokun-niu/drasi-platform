@@ -67,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "drasi-redis".to_string(), // Replace with config.redis_host if available
         6379,                 
         format!("{}-dispatch", config.source_id), // Match Dapr topic
-        None
+        Some(true),
     );
 
     let reader = RedisReader::new(redis_settings);
@@ -130,7 +130,7 @@ async fn process_messages(mut rx: Receiver<RedisStreamReadResult>, state: Arc<Ap
             traceparent,
             receive_time,
         ).await {
-            Ok(_) => log::info!("Message processed successfully"),
+            Ok(_) => {},
             Err(e) => log::error!("Error processing message: {:?}", e),
         }
     }
@@ -209,11 +209,6 @@ async fn process_changes(
         if index > 0 {
             start_time = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
         }
-        info!(
-            "Processing change - id:{}, subscription_count:{}",
-            change_event["id"],
-            change_event["subscriptions"].as_array().map_or(0, |arr| arr.len())
-        );
         let mut dispatch_event = change_event.clone();
         dispatch_event["metadata"]["tracking"]["source"]["changeDispatcherStart_ns"] =
             start_time.into();
