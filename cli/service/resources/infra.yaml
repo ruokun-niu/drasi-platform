@@ -303,9 +303,6 @@ spec:
   accessControl:
     defaultAction: allow
     trustDomain: "public"
-  http:
-    enabled: true
-    http2: true
   tracing:
     samplingRate: "1"
     zipkin:
@@ -346,4 +343,7 @@ spec:
       value: "drasi"
     - name: redisPassword
       value: ""
-
+    - name: processingTimeout
+      value: "200s"  # Much longer timeout
+    # - name: maxRetries
+    #   value: "3"
