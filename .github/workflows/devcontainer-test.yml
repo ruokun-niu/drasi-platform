@@ -44,12 +44,13 @@ jobs:
           uses: actions/checkout@v4
           with:
             repository: drasi-project/learning
+            path: learning-repo
 
         - name: Test devcontainer build and run
           uses: devcontainers/ci@v0.3
           with:
             imageName: test-devcontainer
-            subFolder: .devcontainer/curbside-pickup
+            subFolder: learning-repo/.devcontainer/curbside-pickup
             runCmd: |
                 echo "🧪 Testing devcontainer build and run"
                 
