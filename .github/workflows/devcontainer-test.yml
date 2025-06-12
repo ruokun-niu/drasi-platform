@@ -64,7 +64,7 @@ jobs:
             devcontainer exec --workspace-folder ./learning drasi list query
 
             echo "Applying Drasi Reaction"
-            devcontainer exec --workspace-folder ./learning  drasi apply -f ./resources/hello-world-reactions.yaml
+            devcontainer exec --workspace-folder ./learning  drasi apply -f ./resources/hello-world-reaction.yaml
             devcontainer exec --workspace-folder ./learning  drasi wait reaction hello-world-debug -t 120
             devcontainer exec --workspace-folder ./learning  drasi list reaction
 
