@@ -53,7 +53,6 @@ jobs:
           run: |
             devcontainer up --workspace-folder ./learning 
 
-            code --list-extensions
 
             echo "Applying Drasi Source"
             devcontainer exec --workspace-folder ./learning  drasi apply -f ./resources/hello-world-source.yaml
@@ -83,4 +82,20 @@ jobs:
                 echo "Deploying the my-app pods"
                 devcontainer exec --workspace-folder ./learning --container-name risky-container kubectl apply -f ./resources/my-app.yaml  
                 devcontainer exec --workspace-folder ./learning --container-name risky-container kubectl wait --for=condition=Ready pod -l app=my-app --timeout=120s
+
+                echo "Storing Kubernetes credentials in a secret"
+                devcontainer exec --workspace-folder ./learning --container-name risky-container k3d kubeconfig get k3s-default | sed 's/0.0.0.0.*/kubernetes.default.svc/g' | kubectl create secret generic k8s-context --from-file=context=/dev/stdin -n drasi-system
+
+                echo "Applying Drasi Source"
+                devcontainer exec --workspace-folder ./learning --container-name risky-container drasi apply -f ./resources/sources.yaml
+                devcontainer exec --workspace-folder ./learning --container-name risky-container drasi wait -f ./resources/sources.yaml -t 120
+
+
+                echo "Applying Drasi Queries"
+                devcontainer exec --workspace-folder ./learning --container-name risky-container drasi apply -f ./resources/queries.yaml
+                sleep 5
+                devcontainer exec --workspace-folder ./learning --container-name risky-container drasi list query
+
+                
+
 
