@@ -51,7 +51,10 @@ jobs:
 
         - name: Test devcontainer build and run
           run: |
-            ls
+            devcontainer up --workspace-folder ./learning/.devcontainer/curbside-pickup
+
+            echo "🧪 Testing devcontainer build and run"
+            echo "🎉 Devcontainer test completed successfully!"
 
         # - name: Test devcontainer build and run
         #   uses: devcontainers/ci@v0.3
