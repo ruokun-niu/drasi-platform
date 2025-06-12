@@ -49,9 +49,11 @@ jobs:
         - name: Install Devcontainers CLI
           run:  npm install -g @devcontainers/cli
 
-        - name: Test devcontainer build and run
+        - name: Getting Started
           run: |
             devcontainer up --workspace-folder ./learning 
+
+            code --list-extensions
 
             echo "Applying Drasi Source"
             devcontainer exec --workspace-folder ./learning  drasi apply -f ./resources/hello-world-source.yaml
@@ -70,5 +72,15 @@ jobs:
 
             # Test the result somehow
 
-            
             echo "🎉 Devcontainer test completed successfully!"
+        
+        - name: Risky Container
+          run: |
+                echo "Running risky container"
+                devcontainer up --workspace-folder ./learning --config ./learning/.devcontainer/risky-container/devcontainer.json 
+
+
+                echo "Deploying the my-app pods"
+                devcontainer exec --workspace-folder ./learning --container-name risky-container kubectl apply -f ./resources/my-app.yaml  
+                devcontainer exec --workspace-folder ./learning --container-name risky-container kubectl wait --for=condition=Ready pod -l app=my-app --timeout=120s
+
