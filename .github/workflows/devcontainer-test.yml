@@ -54,37 +54,21 @@ jobs:
             devcontainer up --workspace-folder ./learning 
 
             echo "Applying Drasi Source"
-            devcontainer exec --workspace-folder ./learning drasi apply -f ./resources/hello-world-source.yaml
+            devcontainer exec --workspace-folder ./learning  drasi apply -f ./resources/hello-world-source.yaml
             devcontainer exec --workspace-folder ./learning  drasi wait source hello-world -t 120
             devcontainer exec --workspace-folder ./learning  drasi list source
-            # devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/getting-started/devcontainer.json drasi apply -f ./resources/hello-world-source.yaml
-            # devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/getting-started/devcontainer.json drasi wait source hello-world -t 120
-            # devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/getting-started/devcontainer.json drasi list source
 
+            echo "Applying Drasi Queries"
+            devcontainer exec --workspace-folder ./learning  drasi apply -f ./resources/hello-world-queries.yaml
+            sleep 5
+            devcontainer exec --workspace-folder ./learning drasi list query
 
+            echo "Applying Drasi Reaction"
+            devcontainer exec --workspace-folder ./learning  drasi apply -f ./resources/hello-world-reactions.yaml
+            devcontainer exec --workspace-folder ./learning  drasi wait reaction hello-world-debug -t 120
+            devcontainer exec --workspace-folder ./learning  drasi list reaction
 
+            # Test the result somehow
 
             
             echo "🎉 Devcontainer test completed successfully!"
-
-        # - name: Test devcontainer build and run
-        #   uses: devcontainers/ci@v0.3
-        #   with:
-        #     imageName: test-devcontainer
-        #     subFolder: learning/.devcontainer/curbside-pickup
-        #     runCmd: |
-        #         echo "🧪 Testing devcontainer build and run"
-                
-        #         # Basic checks
-        #         echo "✅ Container is running"
-        #         echo "Current user: $(whoami)"
-        #         echo "Working directory: $(pwd)"
-        #         echo "Workspace contents: $(ls -la /workspace | wc -l) items"
-                
-        #         # Run any shell scripts if they exist
-        #         if [ -f "/workspace/.devcontainer/curbside-pickup/setup.sh" ]; then
-        #         echo "📜 Running setup.sh"
-        #         bash /workspace/.devcontainer/curbside-pickup/setup.sh
-        #         fi
-                
-        #         echo "🎉 Devcontainer test completed successfully!"
