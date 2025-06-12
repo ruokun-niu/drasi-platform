@@ -51,7 +51,7 @@ jobs:
 
         - name: Test devcontainer build and run
           run: |
-            devcontainer up --workspace-folder ./learning --config ./learning/devcontainer/curbside-pickup/devcontainer.json
+            devcontainer up --workspace-folder ./learning --config ./learning/.devcontainer/curbside-pickup/devcontainer.json
 
             echo "🧪 Testing devcontainer build and run"
             echo "🎉 Devcontainer test completed successfully!"
