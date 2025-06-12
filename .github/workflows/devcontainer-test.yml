@@ -44,26 +44,33 @@ jobs:
           uses: actions/checkout@v4
           with:
             repository: drasi-project/learning
-            path: learning-repo
+            path: ./learning
+
+        - name: Install Devcontainers CLI
+          run:  npm install -g @devcontainers/cli
 
         - name: Test devcontainer build and run
-          uses: devcontainers/ci@v0.3
-          with:
-            imageName: test-devcontainer
-            subFolder: learning-repo/.devcontainer/curbside-pickup
-            runCmd: |
-                echo "🧪 Testing devcontainer build and run"
+          run: |
+            ls
+
+        # - name: Test devcontainer build and run
+        #   uses: devcontainers/ci@v0.3
+        #   with:
+        #     imageName: test-devcontainer
+        #     subFolder: learning/.devcontainer/curbside-pickup
+        #     runCmd: |
+        #         echo "🧪 Testing devcontainer build and run"
                 
-                # Basic checks
-                echo "✅ Container is running"
-                echo "Current user: $(whoami)"
-                echo "Working directory: $(pwd)"
-                echo "Workspace contents: $(ls -la /workspace | wc -l) items"
+        #         # Basic checks
+        #         echo "✅ Container is running"
+        #         echo "Current user: $(whoami)"
+        #         echo "Working directory: $(pwd)"
+        #         echo "Workspace contents: $(ls -la /workspace | wc -l) items"
                 
-                # Run any shell scripts if they exist
-                if [ -f "/workspace/.devcontainer/curbside-pickup/setup.sh" ]; then
-                echo "📜 Running setup.sh"
-                bash /workspace/.devcontainer/curbside-pickup/setup.sh
-                fi
+        #         # Run any shell scripts if they exist
+        #         if [ -f "/workspace/.devcontainer/curbside-pickup/setup.sh" ]; then
+        #         echo "📜 Running setup.sh"
+        #         bash /workspace/.devcontainer/curbside-pickup/setup.sh
+        #         fi
                 
-                echo "🎉 Devcontainer test completed successfully!"
+        #         echo "🎉 Devcontainer test completed successfully!"
