@@ -51,12 +51,15 @@ jobs:
 
         - name: Test devcontainer build and run
           run: |
-            devcontainer up --workspace-folder ./learning --config ./learning/.devcontainer/getting-started/devcontainer.json
+            devcontainer up --workspace-folder ./learning 
 
             echo "Applying Drasi Source"
-            devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/getting-started/devcontainer.json drasi apply -f ./resources/hello-world-source.yaml
-            devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/getting-started/devcontainer.json drasi wait source hello-world -t 120
-            devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/getting-started/devcontainer.json drasi list source
+            devcontainer exec --workspace-folder ./learning drasi apply -f ./resources/hello-world-source.yaml
+            devcontainer exec --workspace-folder ./learning  drasi wait source hello-world -t 120
+            devcontainer exec --workspace-folder ./learning  drasi list source
+            # devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/getting-started/devcontainer.json drasi apply -f ./resources/hello-world-source.yaml
+            # devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/getting-started/devcontainer.json drasi wait source hello-world -t 120
+            # devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/getting-started/devcontainer.json drasi list source
 
 
 
