@@ -15,8 +15,8 @@
 
 name: Test Drasi Learning Devcontainers
 on:
-#   push:
-#     branches: [main]
+  push:
+    branches: devcontainer-workflow
 #   pull_request:
 #     branches: [main]
   workflow_dispatch: # Allow manual triggering
