@@ -76,25 +76,25 @@ jobs:
         - name: Risky Container
           run: |
                 echo "Running risky container"
-                devcontainer up  --config ./learning/.devcontainer/risky-containers/devcontainer.json 
+                devcontainer up --workspace-folder ./learning  --config ./learning/.devcontainer/risky-containers/devcontainer.json 
 
 
                 echo "Deploying the my-app pods"
-                devcontainer exec --config ./learning/.devcontainer/risky-containers/ kubectl apply -f ./resources/my-app.yaml  
-                devcontainer exec --config ./learning/.devcontainer/risky-containers/ kubectl wait --for=condition=Ready pod -l app=my-app --timeout=120s
+                devcontainer exec --workspace-folder ./learning  --config ./learning/.devcontainer/risky-containers/ kubectl apply -f ./resources/my-app.yaml  
+                devcontainer exec --workspace-folder ./learning  --config ./learning/.devcontainer/risky-containers/ kubectl wait --for=condition=Ready pod -l app=my-app --timeout=120s
 
                 echo "Storing Kubernetes credentials in a secret"
-                devcontainer exec --config ./learning/.devcontainer/risky-containers/ k3d kubeconfig get k3s-default | sed 's/0.0.0.0.*/kubernetes.default.svc/g' | kubectl create secret generic k8s-context --from-file=context=/dev/stdin -n drasi-system
+                devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/risky-containers/ k3d kubeconfig get k3s-default | sed 's/0.0.0.0.*/kubernetes.default.svc/g' | kubectl create secret generic k8s-context --from-file=context=/dev/stdin -n drasi-system
 
                 echo "Applying Drasi Source"
-                devcontainer exec --config ./learning/.devcontainer/risky-containers/ drasi apply -f ./resources/sources.yaml
-                devcontainer exec --config ./learning/.devcontainer/risky-containers/ drasi wait -f ./resources/sources.yaml -t 120
+                devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/risky-containers/ drasi apply -f ./resources/sources.yaml
+                devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/risky-containers/ drasi wait -f ./resources/sources.yaml -t 120
 
 
                 echo "Applying Drasi Queries"
-                devcontainer exec --config ./learning/.devcontainer/risky-containers/ drasi apply -f ./resources/queries.yaml
+                devcontainer exec --workspace-folder ./learning --config ./learning/.devcontainer/risky-containers/ drasi apply -f ./resources/queries.yaml
                 sleep 5
-                devcontainer exec  --config ./learning/.devcontainer/risky-containers/ drasi list query
+                devcontainer exec --workspace-folder ./learning  --config ./learning/.devcontainer/risky-containers/ drasi list query
 
         # - name: Building Comfort
         #   run: |
