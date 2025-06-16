@@ -193,31 +193,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         state_manager,
         redis_writer_tx: tx,
     });
-    // let subscriber_server = Router::new()
-    //     .route("/dapr/subscribe", get(subscribe))
-    //     .route("/receive", post(receive))
-    //     .with_state(shared_state);
-
-    // let addr = format!("0.0.0.0:{}", config.app_port);
-    // let listener = match tokio::net::TcpListener::bind(addr).await {
-    //     Ok(listener) => listener,
-    //     Err(e) => {
-    //         return Err(Box::<dyn std::error::Error>::from(format!(
-    //             "Error binding to address: {:?}",
-    //             e
-    //         )));
-    //     }
-    // };
-    // axum::serve(listener, subscriber_server).await.unwrap();
-
-    // Ok(())
     let state_clone = shared_state.clone();
     tokio::spawn(async move {
         process_messages(reader_rx, state_clone).await;
     });
 
-        
-   
 
     let app = Router::new()
         .route("/health", get(health_check))
@@ -246,7 +226,6 @@ struct AppState {
     node_subscriber: Subscriber,
     rel_subscriber: Subscriber,
     config: ChangeRouterConfig,
-    // publisher: DaprHttpPublisher,
     state_manager: DaprStateManager,
     redis_writer_tx: Sender<RedisStreamRecordData>,
 }
@@ -281,64 +260,6 @@ async fn process_messages(mut rx: Receiver<RedisStreamReadResult>, state: Arc<Ap
     }
 }
 
-async fn subscribe() -> impl IntoResponse {
-    let config = ChangeRouterConfig::from_env();
-    let subscriptions = vec![json! {
-        {
-            "pubsubname": config.pubsub_name.clone(),
-            "topic": format!("{}-change", config.source_id),
-            "route": "receive"
-        }
-    }];
-
-    Json(subscriptions)
-}
-
-#[axum::debug_handler]
-async fn receive(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(body): Json<Value>,
-) -> impl IntoResponse {
-    // Capture the time when the pubsub receives the event
-    let receive_time = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
-    let trace_parent = match headers.get("traceparent") {
-        Some(trace_parent) => match trace_parent.to_str() {
-            Ok(trace_parent) => trace_parent.to_string(),
-            Err(_e) => "".to_string(),
-        },
-        None => "".to_string(),
-    };
-    let config = state.config.clone();
-    let node_subscriber = &state.node_subscriber;
-    let rel_subscriber = &state.rel_subscriber;
-    let json_data = body["data"].clone();
-
-    let state_manager = &state.state_manager;
-    match process_changes(
-        &state.redis_writer_tx,
-        &json_data,
-        &config,
-        node_subscriber,
-        rel_subscriber,
-        trace_parent,
-        state_manager,
-        receive_time,
-    )
-    .await
-    {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("Failed to process messages: {:?}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": e.to_string()})),
-            );
-        }
-    }
-
-    (StatusCode::OK, Json(json!({"message": "Success"})))
-}
 
 #[allow(clippy::too_many_arguments)]
 async fn process_changes(

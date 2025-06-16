@@ -267,7 +267,7 @@ dependencies = [
  "chrono",
  "drasi-comms-abstractions",
  "drasi-comms-dapr",
- "drasi-comms-redis",
+ "drasi-comms-redis-reader",
  "env_logger",
  "futures",
  "log",
@@ -354,7 +354,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "drasi-comms-redis"
+name = "drasi-comms-redis-reader"
 version = "0.1.0"
 dependencies = [
  "anyhow",

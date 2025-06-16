@@ -29,7 +29,7 @@ use tokio::signal::unix::{signal, SignalKind};
 
 use drasi_comms_abstractions::comms::{Headers, Invoker};
 use drasi_comms_dapr::comms::DaprHttpInvoker;
-use drasi_comms_redis::reader::{RedisReader, RedisReaderSettings, RedisStreamReadResult, RedisStreamRecordData};
+use drasi_comms_redis_reader::reader::{RedisReader, RedisReaderSettings, RedisStreamReadResult, RedisStreamRecordData};
 
 use tokio::sync::mpsc::Receiver;
 use axum::{
@@ -141,54 +141,6 @@ struct AppState {
     invoker: DaprHttpInvoker,
 }
 
-#[axum::debug_handler]
-async fn subscribe() -> impl IntoResponse {
-    let config = ChangeDispatcherConfig::new();
-    let subscriptions = vec![json! {
-        {
-            "pubsubname": &config.pubsub_name,
-            "topic": format!("{}-dispatch", config.source_id),
-            "route": "receive"
-        }
-    }];
-
-    Json(subscriptions)
-}
-
-async fn receive(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(body): Json<Value>,
-) -> impl IntoResponse {
-    // Capture the start time when pubsub receives the event
-    // This is measured in nanoseconds
-    let receive_time = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
-    let traceparent = match headers.get("traceparent") {
-        Some(tp) => match tp.to_str() {
-            Ok(tp) => tp.to_string(),
-            Err(_) => "".to_string(),
-        },
-        None => "".to_string(),
-    };
-
-    // info!(
-    //     "Received changes: {}",
-    //     serde_json::to_string_pretty(&body).unwrap_or_default()
-    // );
-
-    let invoker = &state.invoker;
-    match process_changes(invoker, &body["data"], &state.config, traceparent, receive_time).await {
-        Ok(_) => StatusCode::OK.into_response(),
-        Err(e) => {
-            log::error!("Error processing changes: {:?}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Error processing changes: {:?}", e),
-            )
-                .into_response()
-        }
-    }
-}
 
 async fn process_changes(
     invoker: &DaprHttpInvoker,
