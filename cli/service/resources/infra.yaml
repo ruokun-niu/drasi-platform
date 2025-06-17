@@ -344,6 +344,6 @@ spec:
     - name: redisPassword
       value: ""
     - name: processingTimeout
-      value: "200s"  # Much longer timeout
+      value: "100s"  # Much longer timeout
     # - name: maxRetries
     #   value: "3"
