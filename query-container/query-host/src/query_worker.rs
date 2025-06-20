@@ -146,6 +146,11 @@ impl QueryWorker {
                 }
             };
 
+            let start_timestamp = std::time::SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis();
+
             fill_default_source_labels(&mut modified_config, &continuous_query.get_query());
 
             let source_publisher = change_stream::publisher::Publisher::connect(
@@ -182,29 +187,30 @@ impl QueryWorker {
                 lifecycle.change_state(QueryState::Configured);
             }
 
-            let mut sequence_manager = match SequenceManager::new(result_index.clone()).await {
-                Ok(sm) => sm,
-                Err(err) => {
-                    log::error!("Error initializing sequence manager: {}", err);
-                    lifecycle.change_state(QueryState::TransientError(err.to_string()));
-                    return;
-                }
-            };
-
-            let init_seq = sequence_manager.get().await;
-            log::info!(
-                "Query {} starting at sequence {}",
-                query_id,
-                init_seq.sequence
-            );
-
-            match lifecycle.get_state() {
+            let mut sequence_manager = match lifecycle.get_state() {
                 QueryState::Configured | QueryState::Bootstrapping => {
                     lifecycle.change_state(QueryState::Bootstrapping);
 
                     _ = element_index.clear().await;
                     _ = result_index.clear().await;
                     _ = archive_index.clear().await;
+
+                    // Create SequenceManager AFTER clearing to avoid stale metadata
+                    let mut sequence_manager = match SequenceManager::new(result_index.clone()).await {
+                        Ok(sm) => sm,
+                        Err(err) => {
+                            log::error!("Error initializing sequence manager: {}", err);
+                            lifecycle.change_state(QueryState::TransientError(err.to_string()));
+                            return;
+                        }
+                    };
+
+                    let init_seq = sequence_manager.get().await;
+                    log::info!(
+                        "Query {} starting at sequence {}",
+                        query_id,
+                        init_seq.sequence
+                    );
 
                     if let Err(err) = bootstrap(
                         &query_container_id,
@@ -223,10 +229,31 @@ impl QueryWorker {
                         lifecycle.change_state(QueryState::TerminalError(err.to_string()));
                         return;
                     }
+
+                    sequence_manager
                 }
                 QueryState::TerminalError(_) => todo!(),
-                _ => {}
-            }
+                _ => {
+                    // For non-bootstrap states, create SequenceManager normally
+                    let sequence_manager = match SequenceManager::new(result_index.clone()).await {
+                        Ok(sm) => sm,
+                        Err(err) => {
+                            log::error!("Error initializing sequence manager: {}", err);
+                            lifecycle.change_state(QueryState::TransientError(err.to_string()));
+                            return;
+                        }
+                    };
+
+                    let init_seq = sequence_manager.get().await;
+                    log::info!(
+                        "Query {} starting at sequence {}",
+                        query_id,
+                        init_seq.sequence
+                    );
+
+                    sequence_manager
+                }
+            };
             lifecycle.change_state(QueryState::Running);
 
             let change_stream = match RedisChangeStream::new(
@@ -235,6 +262,7 @@ impl QueryWorker {
                 &query_id,
                 stream_config.buffer_size,
                 stream_config.fetch_batch_size,
+                Some(start_timestamp),
             )
             .await
             {
