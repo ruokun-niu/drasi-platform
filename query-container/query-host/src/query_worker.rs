@@ -187,30 +187,32 @@ impl QueryWorker {
                 lifecycle.change_state(QueryState::Configured);
             }
 
-            let mut sequence_manager = match lifecycle.get_state() {
+
+            _ = result_index.clear().await;
+            
+            let mut sequence_manager = match SequenceManager::new(result_index.clone()).await {
+                Ok(sm) => sm,
+                Err(err) => {
+                    log::error!("Error initializing sequence manager: {}", err);
+                    lifecycle.change_state(QueryState::TransientError(err.to_string()));
+                    return;
+                }
+            };
+
+            let init_seq = sequence_manager.get().await;
+            log::info!(
+                "Query {} starting at sequence {}",
+                query_id,
+                init_seq.sequence
+            );
+
+            match lifecycle.get_state() {
                 QueryState::Configured | QueryState::Bootstrapping => {
                     lifecycle.change_state(QueryState::Bootstrapping);
 
                     _ = element_index.clear().await;
-                    _ = result_index.clear().await;
+                    
                     _ = archive_index.clear().await;
-
-                    // Create SequenceManager AFTER clearing to avoid stale metadata
-                    let mut sequence_manager = match SequenceManager::new(result_index.clone()).await {
-                        Ok(sm) => sm,
-                        Err(err) => {
-                            log::error!("Error initializing sequence manager: {}", err);
-                            lifecycle.change_state(QueryState::TransientError(err.to_string()));
-                            return;
-                        }
-                    };
-
-                    let init_seq = sequence_manager.get().await;
-                    log::info!(
-                        "Query {} starting at sequence {}",
-                        query_id,
-                        init_seq.sequence
-                    );
 
                     if let Err(err) = bootstrap(
                         &query_container_id,
@@ -229,31 +231,10 @@ impl QueryWorker {
                         lifecycle.change_state(QueryState::TerminalError(err.to_string()));
                         return;
                     }
-
-                    sequence_manager
                 }
                 QueryState::TerminalError(_) => todo!(),
-                _ => {
-                    // For non-bootstrap states, create SequenceManager normally
-                    let sequence_manager = match SequenceManager::new(result_index.clone()).await {
-                        Ok(sm) => sm,
-                        Err(err) => {
-                            log::error!("Error initializing sequence manager: {}", err);
-                            lifecycle.change_state(QueryState::TransientError(err.to_string()));
-                            return;
-                        }
-                    };
-
-                    let init_seq = sequence_manager.get().await;
-                    log::info!(
-                        "Query {} starting at sequence {}",
-                        query_id,
-                        init_seq.sequence
-                    );
-
-                    sequence_manager
-                }
-            };
+                _ => {}
+            }
             lifecycle.change_state(QueryState::Running);
 
             let change_stream = match RedisChangeStream::new(
