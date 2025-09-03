@@ -97,6 +97,9 @@ jobs:
           echo "🔍 Validating multi-architecture support for Drasi images..."
           echo "📋 Using image tag: $IMAGE_TAG"
           
+          # Images that only need amd64 support
+          AMD64_ONLY_IMAGES="ghcr.io/drasi-project/reaction-dataverse"
+          
           failed_images=()
           
           for image in $DRASI_IMAGES; do
@@ -127,37 +130,50 @@ jobs:
               arm64_support=true
             fi
             
-            # Fail if not multi-arch
-            if [[ "$amd64_support" == true && "$arm64_support" == true ]]; then
-              echo "✅ $image:$IMAGE_TAG supports both amd64 and arm64"
+            # Check if this image is in the amd64-only list
+            if echo "$AMD64_ONLY_IMAGES" | grep -q "$image"; then
+              # For amd64-only images, only require amd64 support
+              if [[ "$amd64_support" == true ]]; then
+                echo "✅ $image:$IMAGE_TAG supports amd64 (amd64-only image)"
+              else
+                echo "❌ ERROR: $image:$IMAGE_TAG missing amd64 support"
+                failed_images+=("$image:$IMAGE_TAG (missing: amd64)")
+              fi
             else
-              missing_archs=""
-              if [[ "$amd64_support" == false ]]; then
-                missing_archs="amd64"
-              fi
-              if [[ "$arm64_support" == false ]]; then
-                if [[ -n "$missing_archs" ]]; then
-                  missing_archs="$missing_archs, arm64"
-                else
-                  missing_archs="arm64"
+              # For all other images, require both amd64 and arm64
+              if [[ "$amd64_support" == true && "$arm64_support" == true ]]; then
+                echo "✅ $image:$IMAGE_TAG supports both amd64 and arm64"
+              else
+                missing_archs=""
+                if [[ "$amd64_support" == false ]]; then
+                  missing_archs="amd64"
                 fi
+                if [[ "$arm64_support" == false ]]; then
+                  if [[ -n "$missing_archs" ]]; then
+                    missing_archs="$missing_archs, arm64"
+                  else
+                    missing_archs="arm64"
+                  fi
+                fi
+                echo "❌ ERROR: $image:$IMAGE_TAG missing support for: $missing_archs"
+                failed_images+=("$image:$IMAGE_TAG (missing: $missing_archs)")
               fi
-              echo "❌ ERROR: $image:$IMAGE_TAG missing support for: $missing_archs"
-              failed_images+=("$image:$IMAGE_TAG (missing: $missing_archs)")
             fi
           done
           
-          # Fail the job if any images are not multi-arch
+          # Fail the job if any images don't meet their architecture requirements
           if [ ${#failed_images[@]} -gt 0 ]; then
             echo ""
-            echo "❌ VALIDATION FAILED: The following images do not support multi-architecture:"
+            echo "❌ VALIDATION FAILED: The following images do not meet architecture requirements:"
             for failed_image in "${failed_images[@]}"; do
               echo "  - $failed_image"
             done
             echo ""
-            echo "All Drasi images must support both amd64 and arm64 architectures."
+            echo "Requirements:"
+            echo "- Most images: amd64 + arm64 support required"
+            echo "- reaction-dataverse: amd64 support only required"
             exit 1
           fi
           
           echo ""
-          echo "✅ SUCCESS: All images support multi-architecture (amd64 + arm64) for version $IMAGE_TAG"
+          echo "✅ SUCCESS: All images meet their architecture requirements for version $IMAGE_TAG"
