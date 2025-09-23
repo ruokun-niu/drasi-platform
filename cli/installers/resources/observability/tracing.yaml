@@ -146,6 +146,12 @@ spec:
             value: "drasi"        
           - name: GF_SECURITY_ADMIN_PASSWORD
             value: "drasi"            
+          - name: GF_INSTALL_PLUGINS
+            value: "https://github.com/drasi-project/grafana-signalr/releases/download/v0.1.0-alpha/drasi-signalr-0.1.0-alpha.zip;drasi-signalr"
+          - name: GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS
+            value: "drasi-signalr"
+          - name: GF_PLUGINS_ENABLE_ALPHA
+            value: "true"
         resources:
           requests:
             memory: "256Mi"
