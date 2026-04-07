@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Rust Lint
+name: Trigger Issue Research
 
 on:
-  push:
-    branches: ['*']
-  pull_request:
-    branches: ["main"]
+  issues:
+    types: [labeled]
 
 jobs:
-  lint:
-    uses: drasi-project/.github/.github/workflows/rust-lint.yaml@main
+  research:
+    if: github.event.label.name == 'needs-research'
+    uses: drasi-project/.github/.github/workflows/drasi-issue-researcher.lock.yml@main
+    with:
+      issue_url: ${{ github.event.issue.html_url }}
+    secrets: inherit
